@@ -1,0 +1,2130 @@
+openapi: 3.0.1
+info:
+  title: WFM Backend
+  description: Описание API WFM для Digital Assistant
+  version: "2.0"
+servers:
+- url: https://stage.betterstore.tech/wfm/api/
+security:
+- APITokenHeader: []
+tags:
+- name: Auth
+  description: Вход и выход из системы
+- name: Task
+  description: Задачи сотрудника
+- name: Task_in_shop
+  description: Задачи в магазине. Требуется permission - "task_in_shop". Для получение карточки задачи и для обычных действий с задачей используй api из раздела "Task"
+- name: Manual_task
+  description: Ручные задачи сотрудника.
+- name: Manual_task_in_shop
+  description: Ручные задачи в магазине. Требуется permission - "manual_task_in_shop". Для получение карточки задачи и для обычных действий с задачей используй api из раздела "Manual_task"
+- name: Problem_task_in_shop
+  description: Проблемные задачи в магазине. Требуется permission - "problem_task_in_shop". Для получение карточки задачи используй api из раздела "Task" || "Manual_task"
+- name: Counter
+  description: Счетчики новых задач
+- name: User
+  description: Пользователь
+- name: Work_Schedule
+  description: Рабочий график
+- name: Appeal
+  description: Обращения
+- name: Work Session
+  description: Рабочая сессия
+- name: CheckList
+
+paths:
+  /v1/auth/logon:
+    post:
+      tags:
+      - Auth
+      summary: Вход
+      description: В случае успешного входа в HTTP headers добавляется X-API-Token,
+        который нужно использовать для всех требующих авторизации запросов
+      requestBody:
+        content:
+          'application/json':
+            schema:
+              $ref: '#/components/schemas/LoginPayload'
+        required: false
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/loginResponse200'
+        400:
+          description: См описание модели Http_resp_error_VALIDATE
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_VALIDATE'
+      x-codegen-request-body-name: body
+  /v1/auth/logout:
+    post:
+      tags:
+      - Auth
+      summary: Выход
+      responses:
+        200:
+          description: OK
+          content: {}
+        500:
+          description: Internal error
+          content: {}
+  /v1/auth/recovery:
+    post:
+      tags:
+      - Auth
+      summary: Запрос на применение нового пароля взамен забытого или применение нового
+        пароля (если вход первый раз)
+      description: До подтверждения смены пароля действует старый пароль. Можно запрашивать
+        новый пароль несколько раз до подтверждения
+      requestBody:
+        description: ddd
+        content:
+          'application/json':
+            schema:
+              type: object
+              properties:
+                login:
+                  type: string
+                  example: "79150527882"
+                password:
+                  type: string
+                  example: "159753"
+        required: false
+      responses:
+        200:
+          description: Заявка на смену пароля принята
+          content: {}
+        400:
+          description: См описание моделей 1) Http_resp_error_VALIDATE
+          content: {}
+      x-codegen-request-body-name: body
+  /v2/task/current:
+    get:
+      tags:
+      - Task
+      summary: Получить задачи пользователя и задачи, которые никто не взял пока
+      description: Для вкладки "Текущие"
+      parameters:
+      - name: category_items
+        in: query
+        description: Для получения всей категории передается id категории, для подкатегории
+          - id категории + id подкатегории. Например - ["1", "2:1", "2:2", "3"]. Т.е.
+          выбраны категории 1 и 3 полностью, в категории 2 выбраны подкатегории 1
+          и 2
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      responses:
+        200:
+          description: OK
+          content:
+            'application/json':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Current_Tasks'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 3) Http_resp_error_VALIDATE
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+  /v2/task/done:
+    get:
+      tags:
+      - Task
+      summary: Получить список выполненных задач
+      description: Задачи во вкладке "Завершенные"
+      parameters:
+      - name: category_items
+        in: query
+        description: Для получения всей категории передается id категории, для подкатегории
+          - id категории + id подкатегории. Например - ["1", "2:1", "2:2", "3"]. Т.е.
+          выбраны категории 1 и 3 полностью, в категории 2 выбраны подкатегории 1
+          и 2
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      - name: statuses
+        in: query
+        description: 'Передаются списком через ",". Например: added_to_shelf,Already_on_shelf,Out_of_stock_in_shop,Problem_with_task'
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            'application/json':
+              schema:
+                $ref: '#/components/schemas/Done_Tasks'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized
+          content: {}
+  /v2/task/{task_id}:
+    get:
+      tags:
+      - Task
+      summary: Получить задачу
+      description: Получить задачу
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task_V2'
+        400:
+          description: См описание модели 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+        500:
+          description: Unexpected error
+          content: {}
+    put:
+      tags:
+      - Task
+      summary: Обновить задачу
+      description: Обновить задачу
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - status
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - doing
+                  - added_to_shelf
+                  - Already_on_shelf
+                  - Out_of_stock_in_shop
+                  - Problem_with_task
+                  default: doing
+                rest_products:
+                  type: integer
+                  description: Остаток товара указывается, если есть required_calc_rest_products
+                  format: int32
+                reason:
+                  type: string
+                  enum:
+                  - no_price
+                  - item_damaged
+                  - not_found_on_shelf
+                  - other
+                reason_description:
+                  type: string
+                image:
+                  type: string
+                  format: binary
+        required: true
+      responses:
+        200:
+          description: OK
+          content:
+            'application/json':
+              schema:
+                $ref: '#/components/schemas/Task_V2'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_VALIDATE
+            3) Http_error_task_already_taken_in_working
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+  /v1/task/filter/category:
+    get:
+      tags:
+      - Task
+      summary: Фильтры по категориям
+      description: Описание
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_VALIDATE
+          content: {}
+
+
+  /v1/task/filter/type_task:
+    get:
+      tags:
+      - Task
+      summary: Получить возможные типы задач
+      description: Для возможности фильтрации списка задач
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HandbookTaskTypes'
+        400:
+          description: См описание модели Http_resp_error_NOT_Autorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+
+
+  /v1/task/filter/task_status:
+    get:
+      tags:
+      - Task
+      summary: Получить список статусов(завершенных) для задач
+      description: Для возможности фильтрации списка задач
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HandbookTaskStatuses'
+
+
+  /v1/task/handbook/problem_reason:
+    get:
+      tags:
+      - Task
+      summary: Получить список причин для отображения проблем с заданием
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Handbook_problem_reason'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized
+          content: {}
+
+
+  /v1/task/handbook/validation_rule:
+    get:
+      tags:
+      - Task
+      summary: Получить "Правила проверки"
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Handbook_validation_rule'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized
+          content: {}
+
+
+
+
+  /v1/task_in_shop/current:
+    get:
+      tags:
+      - Task_in_shop
+      summary: Получить все задачи в магазине
+      description: Для вкладки "Текущие"
+      parameters:
+      - name: category_items
+        in: query
+        description: Для получения всей категории передается id категории, для подкатегории
+          - id категории + id подкатегории. Например - ["1", "2:1", "2:2", "3"]. Т.е.
+          выбраны категории 1 и 3 полностью, в категории 2 выбраны подкатегории 1
+          и 2
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Current_Tasks'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission
+            3) Http_resp_error_VALIDATE
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+  /v1/task_in_shop/done:
+    get:
+      tags:
+      - Task_in_shop
+      summary: Получить все выполненные задачи в магазине
+      description: Задачи во вкладке "Завершенные"
+      parameters:
+      - name: category_items
+        in: query
+        description: Для получения всей категории передается id категории, для подкатегории
+          - id категории + id подкатегории. Например - ["1", "2:1", "2:2", "3"]. Т.е.
+          выбраны категории 1 и 3 полностью, в категории 2 выбраны подкатегории 1
+          и 2
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: integer
+      - name: statuses
+        in: query
+        description: 'Передаются списком через ",". Например: proccessed,added_to_shelf,Already_on_shelf,Out_of_stock_in_shop'
+        style: form
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Done_Tasks'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission
+            3) Http_resp_error_VALIDATE
+          content: {}
+
+
+
+
+  /v1/manual_task/current:
+    get:
+      tags:
+      - Manual_task
+      summary: Получить "текущие" ручные задачи для сотрудника
+      description: Для вкладки "Текущие"
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Current_Manual_Tasks'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission 3) Http_resp_error_VALIDATE
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+  /v1/manual_task/done:
+    get:
+      tags:
+      - Manual_task
+      summary: Получить "выполненные" ручные задачи для сотрудника
+      description: Для вкладки "Выполненные"
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Done_Manual_Tasks'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission 3) Http_resp_error_VALIDATE
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+  /v1/manual_task/{task_id}:
+    get:
+      tags:
+      - Manual_task
+      summary: Получить задачу
+      description: Получить задачу
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manual_Task'
+        400:
+          description: См описание модели 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+        500:
+          description: Unexpected error
+          content: {}
+
+
+    put:
+      tags:
+      - Manual_task
+      summary: Обновить задачу
+      description: Обновить задачу
+      parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - status
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - doing
+                  - fulfilled
+                  - Problem_with_task
+                  default: doing
+                text:
+                  type: string
+                  description: Выполнил
+                reason:
+                  type: string
+                  description: Помогите
+                image:
+                  type: string
+                  format: binary
+        required: true
+      responses:
+        200:
+          description: OK
+          content:
+            'application/json':
+              schema:
+                $ref: '#/components/schemas/Manual_Task'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_VALIDATE 3) Http_error_task_already_taken_in_working
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+  /v1/manual_task_in_shop/current:
+    get:
+      tags:
+      - Manual_task_in_shop
+      summary: Получить все "текущие" ручные задачи в магазине
+      description: Для вкладки "Текущие"
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Current_Manual_Tasks'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission
+            3) Http_resp_error_VALIDATE
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+  /v1/manual_task_in_shop/done:
+    get:
+      tags:
+      - Manual_task_in_shop
+      summary: Получить все "выполненные" ручные задачи в магазине
+      description: Для вкладки "Выполненные"
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Done_Manual_Tasks_For_Director'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission 3) Http_resp_error_VALIDATE
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+  /v1/manual_task_in_shop:
+    post:
+      tags:
+      - Manual_task_in_shop
+      summary: Создать ручнуню задачу
+      description: 'Для данного метода нужен Content-type: multipart/form-data.'
+      requestBody:
+        content:
+          multipart/form-data: # Media type
+            schema:            # Request payload
+              type: object
+              required:
+                - end
+                - name
+                - priority
+                - required_photo
+                - required_text
+                - start
+              properties:      # Request parts
+                wfm_user_ids:
+                  type: string
+                  description: null || JSON.stringify([1,2,3])
+                name:
+                  type: string
+                description:
+                  type: string
+                priority:
+                  type: number
+                  enum:
+                    - "2"
+                    - "1"
+                    - "3"
+                required_text:
+                  type: boolean
+                required_photo:
+                  type: boolean
+                start:
+                  type: string
+                  description: '2021-01-15T09:26:37.575Z'
+                  format: date
+                end:
+                  type: string
+                  description: '2021-01-15T13:26:37.575Z'
+                  format: date
+                image1:
+                  type: string
+                  format: binary
+                image2:
+                  type: string
+                  format: binary
+        required: true
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Manual_Task'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_VALIDATE
+            3) Http_resp_error_Permission
+          content: {}
+
+
+  /v1/manual_task_in_shop/wfm_user:
+    get:
+      tags:
+      - Manual_task_in_shop
+      summary: Список сотрудников для назначения
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  required:
+                  - fio
+                  - id
+                  - image
+                  type: object
+                  properties:
+                    id:
+                      type: number
+                      example: 1.0
+                    fio:
+                      type: string
+                      example: Иванов Василий
+                    image:
+                      type: string
+                      example: https://cdn.betterstore.tech/user-image/example_1583930668919.jpeg
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission
+            3) Http_resp_error_VALIDATE
+          content: {}
+
+
+  /v1/manual_task_in_shop/{manual_task_id}:
+    delete:
+      tags:
+      - Manual_task_in_shop
+      summary: Удалить ручную задачу
+      parameters:
+      - name: manual_task_id
+        in: path
+        description: id задачи
+        required: true
+        schema:
+          type: integer
+      responses:
+        200:
+          description: OK
+          content: {}
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission
+            3) Http_resp_error_VALIDATE
+          content: {}
+
+
+
+
+
+  /v1/problem_task_in_shop/current:
+    get:
+      tags:
+      - Problem_task_in_shop
+      summary: Получить все нерешенные проблемные задачи в магазине
+      description: Для вкладки "Текущие"
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Problem_current_tasks'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission
+            3) Http_resp_error_VALIDATE
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+  /v1/problem_task_in_shop/done:
+    get:
+      tags:
+      - Problem_task_in_shop
+      summary: Получить все решенные проблемные задачи в магазине
+      description: Задачи во вкладке "Завершенные"
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Problem_done_tasks'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission 3) Http_resp_error_VALIDATE
+          content: {}
+
+
+  /v1/problem_task_in_shop/{task_id}:
+    put:
+      tags:
+      - Problem_task_in_shop
+      summary: Решить проблемную задачу
+      parameters:
+      - name: task_id
+        in: path
+        description: id задачи
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        description: Результат
+        content:
+          'application/json':
+            schema:
+              type: object
+              properties:
+                resolve:
+                  type: boolean
+                  example: true
+        required: false
+      responses:
+        200:
+          description: OK
+          content: {}
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission
+            3) Http_resp_error_VALIDATE
+          content: {}
+      x-codegen-request-body-name: body
+
+
+  /v1/counter:
+    get:
+      tags:
+      - Counter
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Counters'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+  /v1/counter/{section}/{sheet}:
+    put:
+      tags:
+      - Counter
+      parameters:
+      - name: section
+        in: path
+        description: Раздел
+        required: true
+        schema:
+          type: string
+          enum:
+            - osa_task
+            - unresolved_task
+            - manual_task
+      - name: sheet
+        in: path
+        description: '"Текущие" || "Выполненные"'
+        required: true
+        schema:
+          type: string
+          enum:
+            - new
+            - done
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema: {}
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+  /v2/user/profile:
+    get:
+      tags:
+      - User
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Profile'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+  /v1/user/push/token:
+    post:
+      tags:
+        - User
+      summary: Добавить токен для получения пушей
+      requestBody:
+        content:
+          'application/json':
+            schema:
+              properties:
+                push_token:
+                  type: string
+                  example: 'epJpasdasdTxyegHWWdqNrkEb:APA91bGebNadad8bTuHhRnAewre-mV7wFB-jRMjnuf0hDsjjpz1-5gwGKVYP_C9gBIQKZTrhQf39NxGcWf5b9V9LEUtmxkRWy0AnLFmetFwERIw-934-FdR3WqcACulnUGAkx6w70QAasdaUoAJ'
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                {}
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized
+          content: {}
+        500:
+          description: Unexpected error
+          content: {}
+
+
+
+
+  /v2/work_schedule/{date}:
+    get:
+      tags:
+      - Work_Schedule
+      summary: Рабочий график пользователя
+      description: Получить рабочие дни продавца
+      parameters:
+      - name: date
+        in: path
+        description: YYYYMM
+        required: true
+        schema:
+          type: string
+          pattern: '^\d{6}$'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Work_Calendar'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission 3) Http_resp_error_VALIDATE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+
+
+  /v2/work_schedule/manual_task/{date}:
+    get:
+      tags:
+      - Work_Schedule
+      summary: План на месяц для ручных задач. Требуется permission - "manual_task_in_shop".
+      description: ''
+      parameters:
+      - name: date
+        in: path
+        description: YYYYMM
+        required: true
+        schema:
+          type: string
+          pattern: '^\d{6}$'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule_For_Manual_Task'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_Permission 3) Http_resp_error_VALIDATE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+
+
+
+
+  /v1/appeal:
+    get:
+      tags:
+      - Appeal
+      summary: Список обращений по статусу
+      parameters:
+      - name: status
+        in: query
+        description: Получить список обращений, возможные статусы - [opened, closed]
+        schema:
+          type: string
+          enum:
+          - opened
+          - closed
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppealList'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_VALIDATE
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+      deprecated: true
+    post:
+      tags:
+      - Appeal
+      summary: Создать обращение
+      description: 'Для данного метода нужен Content-type: multipart/form-data'
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              properties:
+                name:
+                  type: string
+                text:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        200:
+          description: OK
+          content: {}
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_VALIDATE_FILE
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+      deprecated: true
+  /v1/appeal/{appeal_id}:
+    get:
+      tags:
+      - Appeal
+      summary: Детальное описание обращения
+      parameters:
+      - name: appeal_id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/AppealItem'
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2)Http_resp_error_NOT_FOUND
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+      deprecated: true
+  /v1/appeal/{appeal_id}/read:
+    put:
+      tags:
+      - Appeal
+      summary: Пометить прочитанными сообщения в обращении
+      parameters:
+      - name: appeal_id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        200:
+          description: OK
+          content: {}
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+      deprecated: true
+  /v1/appeal/{appeal_id}/close:
+    put:
+      tags:
+      - Appeal
+      summary: Закрыть обращение
+      parameters:
+      - name: appeal_id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        200:
+          description: OK
+          content: {}
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+      deprecated: true
+  /v1/appeal/{appeal_id}/answer:
+    post:
+      tags:
+      - Appeal
+      summary: Создать ответ на обращение
+      description: 'Для данного метода нужен Content-type: multipart/form-data'
+      parameters:
+      - name: appeal_id
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              required:
+              - text
+              properties:
+                text:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+        required: true
+      responses:
+        200:
+          description: OK
+          content: {}
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_VALIDATE_FILE
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+      deprecated: true
+  /v1/work_session:
+    get:
+      tags:
+      - Work Session
+      summary: Получение id сессии для отслеживания
+      description: Вызывается после авторизации. Если work_session_id приходит null
+        - вызвать POST /v1/work_session/start
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  work_session_id:
+                    type: integer
+                    description: Опциональный, если не null, значит, у пользователя
+                      есть сессия
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_VALIDATE_FILE
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+  /v1/work_session/start:
+    post:
+      tags:
+      - Work Session
+      summary: Начало рабочего дня
+      description: Вызывается после успешной авторизации, если при вызове GET /v1/work_session
+        параметр work_session_id - null
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                properties:
+                  work_session_id:
+                    type: integer
+                    description: id сессии
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_VALIDATE
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+  /v1/work_session/stop:
+    post:
+      tags:
+      - Work Session
+      summary: Окончание рабочего дня
+      description: Окончание рабочего дня. Вызывается пользователем вручную, work_session_id
+        помечается как "истекший"
+      requestBody:
+        description: Передать id сессии
+        content:
+          '*/*':
+            schema:
+              type: object
+              properties:
+                work_session_id:
+                  type: integer
+                  description: id сессии
+        required: false
+      responses:
+        200:
+          description: OK
+          content: {}
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_VALIDATE
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Http_resp_error_NOT_Autorized'
+      x-codegen-request-body-name: body
+  /v1/check_list:
+    get:
+      tags:
+      - CheckList
+      summary: Получить список чеклистов
+      responses:
+        200:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    name:
+                      type: string
+                      example: Сходить на обед
+                    time:
+                      type: object
+                      properties:
+                        hour:
+                          type: integer
+                          example: 11
+                        min:
+                          type: integer
+                          example: 23
+                    checked:
+                      type: boolean
+                      example: false
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized
+          content: {}
+      deprecated: true
+  /v1/check_list/{check_list_id}:
+    post:
+      tags:
+      - CheckList
+      summary: Отметить чеклист как выполненный/невыполненный
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              type: object
+              properties:
+                checked:
+                  type: boolean
+                  example: true
+        required: true
+      responses:
+        200:
+          description: OK
+          content: {}
+        400:
+          description: См описание моделей 1) Http_resp_error_NOT_Autorized 2) Http_resp_error_VALIDATE
+          content: {}
+      deprecated: true
+      x-codegen-request-body-name: body
+
+
+components:
+  schemas:
+
+
+    Current_Tasks:
+      required:
+      - id
+      - image
+      - name
+      - status
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 81
+        name:
+          type: string
+          example: Молоко Простоквашино
+        status:
+          type: string
+          enum:
+          - doing
+          - ready_for_work
+        image:
+          type: string
+          example: https://dev1.digitalretail.tech/stat/product_image/51651.jpeg
+
+
+    Done_Tasks:
+      type: array
+      items:
+        required:
+        - id
+        - image
+        - name
+        - status
+        type: object
+        properties:
+          id:
+            type: integer
+            example: 477
+          status:
+            type: string
+            enum:
+            - added_to_shelf
+            - Already_on_shelf
+            - Out_of_stock_in_shop
+            - Problem_with_task
+          name:
+            type: string
+            example: Молоко Простоквашино
+          image:
+            type: string
+            example: https://dev1.digitalretail.tech/stat/product_image/La_Croix_Cabernet-1.jpeg
+
+    Done_Manual_Tasks:
+      required:
+      - id
+      - expired
+      - image
+      - name
+      - status
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 81
+        name:
+          type: string
+          example: Ручная задача
+        expired:
+          type: boolean
+          example: true
+        status:
+          type: string
+          enum:
+          - fulfilled
+          - Problem_with_task
+        image:
+          type: string
+          example: https://dev1.digitalretail.tech/stat/product_image/51651.jpeg
+
+    Manual_Task:
+      required:
+      - id
+      - name
+      - status
+      - priority
+      - required_text
+      - required_photo
+      - start
+      - end
+      - created_at
+      - author
+      - expired
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 31084
+        name:
+          type: string
+          example: Ручная задача
+        description:
+          type: string
+          example: Помой пол
+        status:
+          type: string
+          enum:
+          - ready_for_work
+          - doing
+          - fulfilled
+          - Problem_with_task
+        wfm_users:
+          type: array
+          items:
+            type: object
+            required:
+            - id
+            - you
+            - fio
+            properties:
+              id:
+                type: integer
+                example: 2
+              you:
+                type: boolean
+                example: true
+              fio:
+                type: string
+                example: Иванов Василий
+        images:
+          type: array
+          items:
+            type: string
+          example: [ "https://cdn.betterstore.tech/image-manual-task/user_logo_2980460d-bd5e-4b56-832b-462c07a5008f.png" ]
+        priority:
+          type: integer
+          enum: [1,2,3]
+        required_text:
+          type: boolean
+          description: нужно ли сотруднику написать текст для выполнения
+          example: true
+        required_photo:
+          type: boolean
+          description: нужно ли сотруднику прикрепить фото для выполнения
+          example: false
+        start:
+          type: string
+          format: date
+          description: Время начала задачи
+          example: 2021-02-03T06:50:49.295Z
+        end:
+          type: string
+          format: date
+          description: Время конца задачи
+          example: 2021-02-03T12:50:49.295Z
+        created_at:
+          type: string
+          format: date
+          description: Когда была создана задача
+          example: 2021-02-03T03:50:49.295Z
+        text_after_done_task:
+          type: string
+          description: Текст после выполнения задачи
+          example: Все решено
+        img_after_done_task:
+          type: string
+          description: Фото после выполнения задачи
+          example: https://path_to_picture
+        reason:
+          type: string
+          example: Помогите
+        author:
+          type: object
+          required:
+            - fio
+            - wfm_user_id
+          properties:
+            wfm_user_id:
+              type: number
+              example: 2
+            adm_user_id:
+              type: number
+              example: 10
+            fio:
+              type: string
+              example: Иванов Виктор Михайлович
+        expired:
+          type: boolean
+          example: false
+        start_time:
+          type: string
+          format: date
+          description: когда взяли в работу задачу
+        end_time:
+          type: string
+          format: date
+          description: когда закончили работать с задачей
+        duration:
+          type: string
+          example: 2 ч 15 мин
+        resolution:
+          type: object
+          properties:
+            resolve:
+              type: boolean
+              example: false
+            confirmed_at:
+              type: string
+              format: date
+          description: Если status === Problem_with_task
+
+
+    Done_Manual_Tasks_For_Director:
+      allOf: # Combines the BasicErrorModel and the inline model
+        - $ref: '#/components/schemas/Done_Manual_Tasks'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum:
+              - fulfilled
+
+    Current_Manual_Tasks:
+      allOf:
+        - $ref: '#/components/schemas/Done_Manual_Tasks'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum:
+              - ready_for_work
+              - doing
+
+    Problem_current_tasks:
+      required:
+      - id
+      - image
+      - name
+      - status
+      - type
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 81
+        name:
+          type: string
+          example: Молоко Простоквашино
+        status:
+          type: string
+          enum:
+          - Problem_task
+        type:
+          type: string
+          enum:
+          - osa_task
+          - manual_task
+        image:
+          type: string
+          example: https://dev1.digitalretail.tech/stat/product_image/51651.jpeg
+    Problem_done_tasks:
+      $ref: '#/components/schemas/Problem_current_tasks'
+    HandbookTaskStatuses:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Выполнено
+        enum_name:
+          type: string
+          example: processed
+    HandbookTaskTypes:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Проверить полку
+        enum:
+          type: string
+          example: check_shelf
+    v2_Update_Task:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - doing
+          - processed
+          - Already_on_shelf
+          - Out_of_stock_in_shop
+          - Problem_with_task
+        reason:
+          type: string
+          description: Поле заполняется, если выбрана причина из списка GET /task/handbook/problem_reason
+          example: item_damaged
+        reason_description:
+          type: string
+          description: Поле заполняется, если в поле reason выбрана причина "other"
+          example: У меня другая проблема с выполнением задачи
+    Task_V2:
+      required:
+      - id
+      - name
+      - required_calc_rest_products
+      - status
+      - stock
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 31084
+        name:
+          type: string
+          example: Йогурт Чудо со вкусом Клубника-Земляника 2,5% 290г
+        image:
+          type: string
+          description: Фото товара
+          example: https://path_to_picture
+        stock:
+          type: integer
+          description: остаток на складе
+          example: 120
+        stock_from_staff:
+          type: integer
+          description: остаток на складе, который указал сотрудник при выполнении
+          example: 5
+        required_calc_rest_products:
+          type: boolean
+          description: нужно ли сотруднику посчитать товар перед  выполнением
+          example: true
+        status:
+          type: string
+          enum:
+          - ready_for_work
+          - doing
+          - processed
+          - Already_on_shelf
+          - Out_of_stock_in_shop
+          - Problem_with_task
+        img_after_done_task:
+          type: string
+          description: Фото после выполнения задачи
+          example: https://path_to_picture
+        reason:
+          type: string
+          enum:
+          - no_price
+          - item_damaged
+          - not_found_on_shelf
+          - other
+        reason_description:
+          type: string
+          example: Помогите!!!
+        start_time:
+          type: string
+          example: 08:45
+        end_time:
+          type: string
+          example: 09:45
+        start_time_2:
+          type: string
+          format: date
+        end_time_2:
+          type: string
+          format: date
+        duration:
+          type: string
+          example: 2 ч 15 мин
+        wfm_user:
+          type: object
+          properties:
+            fio:
+              type: string
+              example: Иванов Василий
+        resolution:
+          type: object
+          properties:
+            resolve:
+              type: boolean
+              example: false
+            confirmed_at:
+              type: string
+              format: date
+          description: Если status === Problem_with_task
+    Category:
+      required:
+      - id
+      - name
+      type: object
+      properties:
+        id:
+          type: string
+          example: "1"
+        name:
+          type: string
+          example: Продукты
+        checked:
+          type: boolean
+          description: true если пользователь привязан к данной категории
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Catetory_items'
+    Catetory_items:
+      required:
+      - id
+      - name
+      type: object
+      properties:
+        id:
+          type: string
+          example: "1"
+        name:
+          type: string
+          example: Молочные продукты
+        checked:
+          type: boolean
+          description: true если пользователь привязан к данной категории
+    Product_categories:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Молочные продукты
+    loginResponse200:
+      required:
+      - X-API-Token
+      - access
+      - logged_user
+      type: object
+      properties:
+        X-API-Token:
+          type: string
+        access:
+          type: array
+          items:
+            type: string
+            enum:
+            - task_in_shop
+        logged_user:
+          $ref: '#/components/schemas/BasicUserInfo'
+    BasicUserInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Иван
+        surname:
+          type: string
+          example: Петров
+
+
+    Counters:
+      type: array
+      items:
+        type: object
+        required:
+          - name
+          - new
+          - done
+        properties:
+          name:
+            type: string
+            enum:
+              - osa_task
+              - unresolved_task
+              - manual_task
+            example: 'osa_task'
+          new:
+            type: number
+            example: 1
+          done:
+            type: number
+            example: 1
+
+
+    Profile:
+      required:
+      - categories
+      - image
+      - name
+      - patronymic
+      - role
+      - shop_adress
+      - statistic
+      - surname
+      type: object
+      properties:
+        name:
+          type: string
+          example: Василий
+        surname:
+          type: string
+          example: Иванов
+        patronymic:
+          type: string
+          example: Петрович
+        image:
+          type: string
+          example: https://cdn.digitalretail.tech/user-image/example_1583930668919.jpeg
+        role:
+          type: string
+          example: работник торгового зала
+        shop_adress:
+          type: string
+          example: Магазин № 773713 Москва, улица Куусинена, 19к1
+        categories:
+          type: array
+          description: Категории товаров, с которыми пользователь может работать
+          items:
+            $ref: '#/components/schemas/Product_categories'
+        statistic:
+          type: array
+          description: Статистика за день
+          items:
+            $ref: '#/components/schemas/UserTaskStatistics'
+    UserTaskStatistics:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Выбираются задачи во всех статусах, где state=done
+          enum:
+          - processed
+          - Already_on_shelf
+          - Out_of_stock_in_shop
+          - Problem_with_task
+        name:
+          type: string
+          description: Было на полке
+        qty:
+          type: integer
+          description: Кол-во выполненных заданий
+          example: 13
+      description: Для отображения статистики пользователя.
+    Http_error_task_already_taken_in_working:
+      type: object
+      properties:
+        error_code:
+          type: integer
+        error_text:
+          type: string
+          enum:
+          - Упс! Эту задачу уже взяли в работу. Возьмите другую
+      description: Упс! Эту задачу уже взяли в работу. Возьмите другую
+    Http_resp_error_NOT_Autorized:
+      type: object
+      properties:
+        error_code:
+          type: integer
+        error_text:
+          type: string
+          enum:
+          - Доступ запрещен
+      description: Доступ запрещен
+    Http_resp_error_VALIDATE:
+      type: object
+      properties:
+        error_code:
+          type: integer
+        error_text:
+          type: string
+          enum:
+          - 'Допустимые статусы: processed, Already_on_shelf, Out_of_stock_in_shop,
+            Problem_with_task'
+      description: Ошибки валидации
+    Http_resp_error_NOT_FOUND:
+      type: object
+      properties:
+        error_code:
+          type: integer
+        error_text:
+          type: string
+          enum:
+          - Нет задачи с таким id
+      description: Сущность не найдена
+    Http_resp_error_VALIDATE_FILE:
+      type: object
+      properties:
+        error_code:
+          type: integer
+        error_text:
+          type: string
+          enum:
+          - Слишком большой файл
+      description: Ошибка валидации файла
+    Http_resp_error_Permission:
+      type: object
+      properties:
+        error_code:
+          type: integer
+        error_text:
+          type: string
+          enum:
+          - Недостаточно прав
+      description: Нет разрешений для данной операции
+    LoginPayload:
+      required:
+      - login
+      - password
+      type: object
+      properties:
+        login:
+          type: string
+          example: 7(555)-555-55-55
+        password:
+          type: string
+          example: "1234"
+      description: Тестовый пользователь 7(555)-555-55-55, пароль 1234
+
+
+    # Work_Calendar:
+    #   type: array
+    #   items:
+    #     required:
+    #     - day
+    #     - start_hhmm
+    #     type: object
+    #     properties:
+    #       day:
+    #         type: string
+    #         example: 2020-10-07
+    #       start_hhmm:
+    #         type: string
+    #         example: 10:04
+    #       end_hhmm:
+    #         type: string
+    #         example: 15:42
+    #       duration:
+    #         type: string
+    #         example: 3 ч 1 мин
+
+
+
+    Schedule_For_Manual_Task:
+      type: array
+      items:
+        required:
+        - day
+        - tasks
+        type: object
+        properties:
+          day:
+            type: integer
+            description: день
+            example: 2
+          tasks:
+            type: array
+            items:
+              required:
+                - id
+                - name
+                - start
+                - end
+                - expired
+              type: object
+              properties:
+                id:
+                  type: number
+                  example: 2021
+                name:
+                  type: string
+                  example: Ручная задача
+                start:
+                  type: string
+                  format: date
+                end:
+                  type: string
+                  format: date
+                expired:
+                  type: boolean
+                  example: false
+
+
+
+
+    Work_Calendar:
+      type: array
+      items:
+        required:
+        - day
+        - start_hhmm
+        type: object
+        properties:
+          day:
+            type: string
+            example: 2020-10-07
+          start_hhmm:
+            type: string
+            example: 10:04
+          end_hhmm:
+            type: string
+            example: 15:42
+          duration:
+            type: string
+            example: 3 ч 1 мин
+
+
+    AppealList:
+      required:
+      - created_at
+      - id
+      - name
+      - status
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Не работает касса
+        created_at:
+          type: string
+          example: 11 декабря 10:51
+        status:
+          type: string
+          example: Закрыто
+        is_unread:
+          type: boolean
+          example: true
+    AppealItem:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Не работает касса
+        created_at:
+          type: string
+          example: 11 декабря 10:51
+        status:
+          type: string
+          example: Закрыто
+        is_unread:
+          type: boolean
+          example: false
+        file_name:
+          type: string
+          example: Безымянный.jpeg
+        text:
+          type: string
+          example: Произошла проблема, описание проблемы
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppealResponse'
+    AppealResponse:
+      type: object
+      properties:
+        text:
+          type: string
+          example: Решение проблемы в процессе
+        created_at:
+          type: string
+          example: 11 декабря 10:51
+        file_name:
+          type: string
+          example: image.gif
+    CreateAppeal:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Не работает касса
+        text:
+          type: string
+          example: Произошла проблема, описание проблемы
+        file:
+          type: string
+          example: http://127.0.0.1:4000/stat/appeal_file/11.csv
+    Handbook_problem_reason:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Нет ценника
+        enum_name:
+          type: string
+          example: no_price
+    Handbook_validation_rule:
+      type: array
+      items:
+        type: string
+        example: Проверьте наличие товара на полке
+
+    # ==== DESCRIPTION PUSH BODY ====
+    Push_Body:
+      type: object
+      required:
+        - token
+        - webpush
+      properties:
+        token:
+          type: string
+          example: epJpURYTxyegHWWdqNrkEb:APA91bGebNJabTuHhRnAewre-mV7wFB-jRMjnuf0hDsjjpz1-5gwGKVYP_C9gBIQKZTrhQf39NxGcWf5b9V9LEUtmxkRWy0AnLFmetFwERIw-934-FdR3WqcACulnUGAkx6w70QAQoAJ
+        webpush:
+          type: object
+          required:
+            - notification
+            - data
+          properties:
+            headers:
+              type: object
+              properties:
+                TTL:
+                  type: string
+                  example: 3600
+            notification:
+              type: object
+              required:
+                - title
+                - body
+              properties:
+                title:
+                  type: string
+                  example: Cloudr
+                body:
+                  type: string
+                  example: У вас новая задача от системы OSA(+1)
+            data:
+              type: object
+              required:
+                - push_type
+              properties:
+                push_type:
+                  type: string
+                  enum:
+                    - osa_task.new
+                    - manual_task.new
+                    - manual_task.done
+                    - unresolved_task.new
+      # ==== END DESCRIPTION PUSH BODY ====
+
+  securitySchemes:
+    APITokenHeader:
+      type: apiKey
+      name: X-API-Token
+      in: header
